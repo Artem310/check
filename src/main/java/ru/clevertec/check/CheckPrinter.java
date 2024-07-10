@@ -19,7 +19,7 @@ public class CheckPrinter {
         appendHeader(sb);
         appendItems(sb);
         appendFooter(sb);
-        System.out.println(sb.toString());
+        System.out.println(sb);
     }
 
     public void printToCSV(String fileName) throws IOException {
