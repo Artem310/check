@@ -13,7 +13,7 @@ public class ShoppingCart {
     }
 
     public void addProduct(Product product, int quantity) {
-        items.put(product, items.getOrDefault(product, 0) + quantity);
+        items.merge(product, quantity, Integer::sum);
     }
 
     public void setDiscountCard(DiscountCard discountCard) {
@@ -25,27 +25,29 @@ public class ShoppingCart {
     }
 
     public double calculateTotal() {
-        double total = 0;
-        for (Map.Entry<Product, Integer> entry : items.entrySet()) {
-            Product product = entry.getKey();
-            int quantity = entry.getValue();
+        return items.entrySet().stream()
+                .mapToDouble(entry -> calculateItemTotal(entry.getKey(), entry.getValue()))
+                .sum();
+    }
 
-            DiscountStrategy strategy;
-            if (product.isWholesaleEligible(quantity)) {
-                strategy = new WholesaleDiscountStrategy();
-            } else if (discountCard != null) {
-                strategy = new CardDiscountStrategy(discountCard.getDiscountAmount());
-            } else {
-                strategy = (price, qty) -> price * qty; // Без скидки
-            }
+    public double calculateItemTotal(Product product, int quantity) {
+        double price = product.getPrice();
+        DiscountStrategy strategy = getDiscountStrategy(product, quantity);
+        return strategy.applyDiscount(price, quantity);
+    }
 
-            total += strategy.applyDiscount(product.getPrice(), quantity);
+    private DiscountStrategy getDiscountStrategy(Product product, int quantity) {
+        if (product.isWholesaleEligible(quantity)) {
+            return new WholesaleDiscountStrategy();
+        } else if (discountCard != null) {
+            return new CardDiscountStrategy(discountCard.getDiscountAmount());
+        } else {
+            return (price, qty) -> price * qty; // No discount
         }
-        return total;
     }
 
     public Map<Product, Integer> getItems() {
-        return items;
+        return new HashMap<>(items);
     }
 
     public DiscountCard getDiscountCard() {
@@ -55,5 +57,5 @@ public class ShoppingCart {
     public double getBalance() {
         return balance;
     }
-
 }
+

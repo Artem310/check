@@ -14,18 +14,7 @@ public class CheckRunner {
             List<Product> products = CSVReader.readProducts("./src/main/resources/products.csv");
             List<DiscountCard> discountCards = CSVReader.readDiscountCards("./src/main/resources/discountCards.csv");
 
-            ShoppingCart cart = new ShoppingCart();
-            for (Map.Entry<Integer, Integer> entry : productQuantities.entrySet()) {
-                Product product = findProductById(products, entry.getKey());
-                if (product == null) {
-                    throw new IllegalArgumentException("Product with id " + entry.getKey() + " not found");
-                }
-                cart.addProduct(product, entry.getValue());
-            }
-
-            DiscountCard discountCard = findDiscountCard(discountCards, discountCardNumber);
-            cart.setDiscountCard(discountCard);
-            cart.setBalance(balanceDebitCard);
+            ShoppingCart cart = createShoppingCart(productQuantities, discountCardNumber, balanceDebitCard, products, discountCards);
 
             CheckPrinter printer = new CheckPrinter(cart);
             printer.printToConsole();
@@ -33,6 +22,26 @@ public class CheckRunner {
         } catch (Exception e) {
             System.err.println("Error: " + e.getMessage());
         }
+    }
+
+    private static ShoppingCart createShoppingCart(Map<Integer, Integer> productQuantities,
+                                                   String discountCardNumber,
+                                                   double balanceDebitCard,
+                                                   List<Product> products,
+                                                   List<DiscountCard> discountCards) {
+        ShoppingCart cart = new ShoppingCart();
+        for (Map.Entry<Integer, Integer> entry : productQuantities.entrySet()) {
+            Product product = findProductById(products, entry.getKey());
+            if (product == null) {
+                throw new IllegalArgumentException("Product with id " + entry.getKey() + " not found");
+            }
+            cart.addProduct(product, entry.getValue());
+        }
+
+        DiscountCard discountCard = findDiscountCard(discountCards, discountCardNumber);
+        cart.setDiscountCard(discountCard);
+        cart.setBalance(balanceDebitCard);
+        return cart;
     }
 
     private static Map<Integer, Integer> parseProductArguments(String[] args) {
@@ -44,7 +53,7 @@ public class CheckRunner {
                     try {
                         int productId = Integer.parseInt(parts[0]);
                         int quantity = Integer.parseInt(parts[1]);
-                        productQuantities.put(productId, productQuantities.getOrDefault(productId, 0) + quantity);
+                        productQuantities.merge(productId, quantity, Integer::sum);
                     } catch (NumberFormatException e) {
                         throw new IllegalArgumentException("Invalid product argument: " + arg);
                     }
