@@ -4,7 +4,7 @@ import java.util.HashMap;
 import java.util.Map;
 
 public class ShoppingCart {
-    private final Map<Product, Integer> items;
+    private Map<Product, Integer> items;
     private DiscountCard discountCard;
     private double balance;
 
@@ -13,7 +13,7 @@ public class ShoppingCart {
     }
 
     public void addProduct(Product product, int quantity) {
-        items.merge(product, quantity, Integer::sum);
+        items.put(product, items.getOrDefault(product, 0) + quantity);
     }
 
     public void setDiscountCard(DiscountCard discountCard) {
@@ -25,29 +25,34 @@ public class ShoppingCart {
     }
 
     public double calculateTotal() {
-        return items.entrySet().stream()
-                .mapToDouble(entry -> calculateItemTotal(entry.getKey(), entry.getValue()))
-                .sum();
+        double total = 0;
+        for (Map.Entry<Product, Integer> entry : items.entrySet()) {
+            Product product = entry.getKey();
+            int quantity = entry.getValue();
+
+            DiscountStrategy strategy;
+            if (product.isWholesaleEligible(quantity)) {
+                strategy = new WholesaleDiscountStrategy();
+            } else if (discountCard != null) {
+                strategy = new CardDiscountStrategy(discountCard.getDiscountAmount());
+            } else {
+                strategy = (price, qty) -> price * qty; // Без скидки
+            }
+
+            total += strategy.applyDiscount(product.getPrice(), quantity);
+        }
+        return total;
     }
 
-    public double calculateItemTotal(Product product, int quantity) {
-        double price = product.getPrice();
-        DiscountStrategy strategy = getDiscountStrategy(product, quantity);
-        return strategy.applyDiscount(price, quantity);
-    }
-
-    private DiscountStrategy getDiscountStrategy(Product product, int quantity) {
-        if (product.isWholesaleEligible(quantity)) {
-            return new WholesaleDiscountStrategy();
-        } else if (discountCard != null) {
-            return new CardDiscountStrategy(discountCard.getDiscountAmount());
-        } else {
-            return (price, qty) -> price * qty; // No discount
+    public void checkBalance() throws InsufficientFundsException {
+        double total = calculateTotal();
+        if (total > balance) {
+            throw new InsufficientFundsException("Недостаточно средств. Требуется: " + total + ", Доступно: " + balance);
         }
     }
 
     public Map<Product, Integer> getItems() {
-        return new HashMap<>(items);
+        return items;
     }
 
     public DiscountCard getDiscountCard() {
@@ -58,4 +63,3 @@ public class ShoppingCart {
         return balance;
     }
 }
-

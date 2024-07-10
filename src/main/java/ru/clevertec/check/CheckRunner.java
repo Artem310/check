@@ -1,5 +1,8 @@
 package main.java.ru.clevertec.check;
 
+import java.io.FileWriter;
+import java.io.IOException;
+import java.io.PrintWriter;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -10,38 +13,39 @@ public class CheckRunner {
             Map<Integer, Integer> productQuantities = parseProductArguments(args);
             String discountCardNumber = parseDiscountCardArgument(args);
             double balanceDebitCard = parseBalanceDebitCardArgument(args);
+            String pathToFile = parsePathToFileArgument(args);
+            String saveToFile = parseSaveToFileArgument(args);
 
-            List<Product> products = CSVReader.readProducts("./src/main/resources/products.csv");
+            if (pathToFile == null) {
+                throw new IllegalArgumentException("Отсутствует аргумент pathToFile");
+            }
+
+            List<Product> products = CSVReader.readProducts(pathToFile);
             List<DiscountCard> discountCards = CSVReader.readDiscountCards("./src/main/resources/discountCards.csv");
 
-            ShoppingCart cart = createShoppingCart(productQuantities, discountCardNumber, balanceDebitCard, products, discountCards);
+            ShoppingCart cart = new ShoppingCart();
+            for (Map.Entry<Integer, Integer> entry : productQuantities.entrySet()) {
+                Product product = findProductById(products, entry.getKey());
+                if (product == null) {
+                    throw new IllegalArgumentException("Продукт с id " + entry.getKey() + " не найден");
+                }
+                cart.addProduct(product, entry.getValue());
+            }
+
+            DiscountCard discountCard = findDiscountCard(discountCards, discountCardNumber);
+            cart.setDiscountCard(discountCard);
+            cart.setBalance(balanceDebitCard);
+
+            cart.checkBalance();
 
             CheckPrinter printer = new CheckPrinter(cart);
             printer.printToConsole();
-            printer.printToCSV("result.csv");
+
+            String outputFile = saveToFile != null ? saveToFile : "result.csv";
+            printer.printToCSV(outputFile);
         } catch (Exception e) {
-            System.err.println("Error: " + e.getMessage());
+            handleException(e, args);
         }
-    }
-
-    private static ShoppingCart createShoppingCart(Map<Integer, Integer> productQuantities,
-                                                   String discountCardNumber,
-                                                   double balanceDebitCard,
-                                                   List<Product> products,
-                                                   List<DiscountCard> discountCards) {
-        ShoppingCart cart = new ShoppingCart();
-        for (Map.Entry<Integer, Integer> entry : productQuantities.entrySet()) {
-            Product product = findProductById(products, entry.getKey());
-            if (product == null) {
-                throw new IllegalArgumentException("Product with id " + entry.getKey() + " not found");
-            }
-            cart.addProduct(product, entry.getValue());
-        }
-
-        DiscountCard discountCard = findDiscountCard(discountCards, discountCardNumber);
-        cart.setDiscountCard(discountCard);
-        cart.setBalance(balanceDebitCard);
-        return cart;
     }
 
     private static Map<Integer, Integer> parseProductArguments(String[] args) {
@@ -53,15 +57,15 @@ public class CheckRunner {
                     try {
                         int productId = Integer.parseInt(parts[0]);
                         int quantity = Integer.parseInt(parts[1]);
-                        productQuantities.merge(productId, quantity, Integer::sum);
+                        productQuantities.put(productId, productQuantities.getOrDefault(productId, 0) + quantity);
                     } catch (NumberFormatException e) {
-                        throw new IllegalArgumentException("Invalid product argument: " + arg);
+                        throw new IllegalArgumentException("Неверный аргумент продукта: " + arg);
                     }
                 }
             }
         }
         if (productQuantities.isEmpty()) {
-            throw new IllegalArgumentException("No valid product arguments provided");
+            throw new IllegalArgumentException("Не предоставлены действительные аргументы продуктов");
         }
         return productQuantities;
     }
@@ -84,11 +88,52 @@ public class CheckRunner {
                 try {
                     return Double.parseDouble(arg.substring("balanceDebitCard=".length()));
                 } catch (NumberFormatException e) {
-                    throw new IllegalArgumentException("Invalid balance argument: " + arg);
+                    throw new IllegalArgumentException("Неверный аргумент баланса: " + arg);
                 }
             }
         }
-        throw new IllegalArgumentException("Balance argument is missing");
+        throw new IllegalArgumentException("Отсутствует аргумент баланса");
+    }
+
+    private static String parsePathToFileArgument(String[] args) {
+        for (String arg : args) {
+            if (arg.startsWith("pathToFile=")) {
+                return arg.substring("pathToFile=".length());
+            }
+        }
+        return null;
+    }
+
+    private static String parseSaveToFileArgument(String[] args) {
+        for (String arg : args) {
+            if (arg.startsWith("saveToFile=")) {
+                return arg.substring("saveToFile=".length());
+            }
+        }
+        return null;
+    }
+
+    private static void handleException(Exception e, String[] args) {
+        String errorMessage;
+        if (e instanceof IllegalArgumentException) {
+            errorMessage = "BAD REQUEST";
+        } else if (e instanceof InsufficientFundsException) {
+            errorMessage = "NOT ENOUGH MONEY";
+        } else {
+            errorMessage = "INTERNAL SERVER ERROR";
+        }
+
+        String saveToFile = parseSaveToFileArgument(args);
+        String outputFile = saveToFile != null ? saveToFile : "result.csv";
+
+        try (PrintWriter writer = new PrintWriter(new FileWriter(outputFile))) {
+            writer.println("Error");
+            writer.println(errorMessage);
+        } catch (IOException ioException) {
+            System.err.println("Ошибка при записи в файл: " + ioException.getMessage());
+        }
+
+        System.err.println("Ошибка: " + errorMessage);
     }
 
     private static Product findProductById(List<Product> products, int id) {
