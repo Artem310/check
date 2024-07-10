@@ -4,7 +4,7 @@ import java.util.HashMap;
 import java.util.Map;
 
 public class ShoppingCart {
-    private Map<Product, Integer> items;
+    private final Map<Product, Integer> items;
     private DiscountCard discountCard;
     private double balance;
 
