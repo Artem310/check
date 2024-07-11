@@ -1,4 +1,4 @@
-package main.java.ru.clevertec.check;
+package ru.clevertec.check;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -34,7 +34,7 @@ public class ShoppingCart {
             if (product.isWholesaleEligible(quantity)) {
                 strategy = new WholesaleDiscountStrategy();
             } else if (discountCard != null) {
-                strategy = new CardDiscountStrategy(discountCard.getDiscountAmount());
+                strategy = new CardDiscountStrategy(discountCard.getAmount());
             } else {
                 strategy = (price, qty) -> price * qty; // Без скидки
             }

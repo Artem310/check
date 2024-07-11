@@ -1,4 +1,4 @@
-package main.java.ru.clevertec.check;
+package ru.clevertec.check;
 
 import java.io.BufferedReader;
 import java.io.FileReader;
@@ -39,8 +39,8 @@ public class CSVReader {
                 if (values.length == 3) {
                     DiscountCard card = new DiscountCard(
                             Integer.parseInt(values[0]),
-                            values[1],
-                            Double.parseDouble(values[2])
+                            Integer.parseInt(values[1]),
+                            (int) Double.parseDouble(values[2])
                     );
                     discountCards.add(card);
                 }

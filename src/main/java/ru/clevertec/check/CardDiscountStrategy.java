@@ -1,4 +1,4 @@
-package main.java.ru.clevertec.check;
+package ru.clevertec.check;
 
 public class CardDiscountStrategy implements DiscountStrategy {
     private final double discountPercentage;

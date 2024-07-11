@@ -1,14 +1,14 @@
-package main.java.ru.clevertec.check;
+package ru.clevertec.check;
 
 public class DiscountCard {
     private int id;
-    private String number;
-    private double discountAmount;
+    private int number;
+    private int amount;
 
-    public DiscountCard(int id, String number, double discountAmount) {
+    public DiscountCard(int id, int number, int amount) {
         this.id = id;
         this.number = number;
-        this.discountAmount = discountAmount;
+        this.amount = amount;
     }
 
     public int getId() {
@@ -19,20 +19,19 @@ public class DiscountCard {
         this.id = id;
     }
 
-    public String getNumber() {
+    public int getNumber() {
         return number;
     }
 
-    public void setNumber(String number) {
+    public void setNumber(int number) {
         this.number = number;
     }
 
-    public double getDiscountAmount() {
-        return discountAmount;
+    public int getAmount() {
+        return amount;
     }
 
-    public void setDiscountAmount(double discountAmount) {
-        this.discountAmount = discountAmount;
+    public void setAmount(int amount) {
+        this.amount = amount;
     }
-
 }

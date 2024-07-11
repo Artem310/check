@@ -1,4 +1,4 @@
-package main.java.ru.clevertec.check;
+package ru.clevertec.check;
 
 import java.io.FileWriter;
 import java.io.IOException;
@@ -46,9 +46,9 @@ public class CheckPrinter {
 
         if (cart.getDiscountCard() != null) {
             System.out.println("-----------------------------------------------------");
-            System.out.printf("DISCOUNT CARD: %s  DISCOUNT: %.1f%%%n",
+            System.out.printf("DISCOUNT CARD: %d  DISCOUNT: %d%%%n",
                     cart.getDiscountCard().getNumber(),
-                    cart.getDiscountCard().getDiscountAmount());
+                    cart.getDiscountCard().getAmount());
         }
 
         System.out.println("=====================================================");
@@ -82,9 +82,9 @@ public class CheckPrinter {
             writer.println();
             writer.printf("DISCOUNT CARD;DISCOUNT PERCENTAGE%n");
             if (cart.getDiscountCard() != null) {
-                writer.printf("%s;%.1f%%%n",
+                writer.printf("%d;%d%%%n",
                         cart.getDiscountCard().getNumber(),
-                        cart.getDiscountCard().getDiscountAmount());
+                        cart.getDiscountCard().getAmount());
             } else {
                 writer.println("N/A;0%");
             }
@@ -95,7 +95,7 @@ public class CheckPrinter {
         }
     }
 
-    private double calculateDiscount(Product product, int quantity) {
+    double calculateDiscount(Product product, int quantity) {
         double regularPrice = product.getPrice() * quantity;
         double discountedPrice;
 
@@ -104,7 +104,7 @@ public class CheckPrinter {
             discountedPrice = regularPrice * 0.9;
         } else if (cart.getDiscountCard() != null) {
             // Скидка по карте
-            discountedPrice = regularPrice * (1 - cart.getDiscountCard().getDiscountAmount() / 100);
+            discountedPrice = regularPrice * (1 - cart.getDiscountCard().getAmount() / 100.0);
         } else {
             // Без скидки
             discountedPrice = regularPrice;

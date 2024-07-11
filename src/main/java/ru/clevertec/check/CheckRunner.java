@@ -1,39 +1,49 @@
-package main.java.ru.clevertec.check;
+package ru.clevertec.check;
 
+import java.sql.Connection;
+import java.util.HashMap;
+import java.util.Map;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.io.PrintWriter;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
 
 public class CheckRunner {
     public static void main(String[] args) {
         try {
-            Map<Integer, Integer> productQuantities = parseProductArguments(args);
-            String discountCardNumber = parseDiscountCardArgument(args);
-            double balanceDebitCard = parseBalanceDebitCardArgument(args);
-            String pathToFile = parsePathToFileArgument(args);
-            String saveToFile = parseSaveToFileArgument(args);
+            Map<String, String> arguments = parseArguments(args);
 
-            if (pathToFile == null) {
-                throw new IllegalArgumentException("Отсутствует аргумент pathToFile");
+            String dbUrl = arguments.get("datasource.url");
+            String dbUsername = arguments.get("datasource.username");
+            String dbPassword = arguments.get("datasource.password");
+
+            if (dbUrl == null || dbUsername == null || dbPassword == null) {
+                throw new IllegalArgumentException("Отсутствуют обязательные параметры подключения к базе данных");
             }
 
-            List<Product> products = CSVReader.readProducts(pathToFile);
-            List<DiscountCard> discountCards = CSVReader.readDiscountCards("./src/main/resources/discountCards.csv");
+            Connection connection = DatabaseConnection.getConnection(dbUrl, dbUsername, dbPassword);
+
+            ProductRepository productRepository = new ProductRepository(connection);
+            DiscountCardRepository discountCardRepository = new DiscountCardRepository(connection);
+
+            Map<Integer, Integer> productQuantities = parseProductArguments(args);
+            String discountCardNumberStr = arguments.get("discountCard");
+            double balanceDebitCard = Double.parseDouble(arguments.get("balanceDebitCard"));
+            String saveToFile = arguments.get("saveToFile");
 
             ShoppingCart cart = new ShoppingCart();
             for (Map.Entry<Integer, Integer> entry : productQuantities.entrySet()) {
-                Product product = findProductById(products, entry.getKey());
+                Product product = productRepository.findById(entry.getKey());
                 if (product == null) {
                     throw new IllegalArgumentException("Продукт с id " + entry.getKey() + " не найден");
                 }
                 cart.addProduct(product, entry.getValue());
             }
 
-            DiscountCard discountCard = findDiscountCard(discountCards, discountCardNumber);
-            cart.setDiscountCard(discountCard);
+            if (discountCardNumberStr != null) {
+                int discountCardNumber = Integer.parseInt(discountCardNumberStr);
+                DiscountCard discountCard = discountCardRepository.findByNumber(discountCardNumber);
+                cart.setDiscountCard(discountCard);
+            }
             cart.setBalance(balanceDebitCard);
 
             cart.checkBalance();
@@ -41,14 +51,26 @@ public class CheckRunner {
             CheckPrinter printer = new CheckPrinter(cart);
             printer.printToConsole();
 
-            String outputFile = saveToFile != null ? saveToFile : "result.csv";
-            printer.printToCSV(outputFile);
+            if (saveToFile != null) {
+                printer.printToCSV(saveToFile);
+            }
         } catch (Exception e) {
             handleException(e, args);
         }
     }
 
-    private static Map<Integer, Integer> parseProductArguments(String[] args) {
+    static Map<String, String> parseArguments(String[] args) {
+        Map<String, String> arguments = new HashMap<>();
+        for (String arg : args) {
+            if (arg.contains("=")) {
+                String[] parts = arg.split("=", 2);
+                arguments.put(parts[0], parts[1]);
+            }
+        }
+        return arguments;
+    }
+
+    static Map<Integer, Integer> parseProductArguments(String[] args) {
         Map<Integer, Integer> productQuantities = new HashMap<>();
         for (String arg : args) {
             if (arg.contains("-")) {
@@ -70,49 +92,6 @@ public class CheckRunner {
         return productQuantities;
     }
 
-    private static String parseDiscountCardArgument(String[] args) {
-        for (String arg : args) {
-            if (arg.startsWith("discountCard=")) {
-                String cardNumber = arg.substring("discountCard=".length());
-                if (cardNumber.length() == 4 && cardNumber.matches("\\d{4}")) {
-                    return cardNumber;
-                }
-            }
-        }
-        return null;
-    }
-
-    private static double parseBalanceDebitCardArgument(String[] args) {
-        for (String arg : args) {
-            if (arg.startsWith("balanceDebitCard=")) {
-                try {
-                    return Double.parseDouble(arg.substring("balanceDebitCard=".length()));
-                } catch (NumberFormatException e) {
-                    throw new IllegalArgumentException("Неверный аргумент баланса: " + arg);
-                }
-            }
-        }
-        throw new IllegalArgumentException("Отсутствует аргумент баланса");
-    }
-
-    private static String parsePathToFileArgument(String[] args) {
-        for (String arg : args) {
-            if (arg.startsWith("pathToFile=")) {
-                return arg.substring("pathToFile=".length());
-            }
-        }
-        return null;
-    }
-
-    private static String parseSaveToFileArgument(String[] args) {
-        for (String arg : args) {
-            if (arg.startsWith("saveToFile=")) {
-                return arg.substring("saveToFile=".length());
-            }
-        }
-        return null;
-    }
-
     private static void handleException(Exception e, String[] args) {
         String errorMessage;
         if (e instanceof IllegalArgumentException) {
@@ -123,7 +102,14 @@ public class CheckRunner {
             errorMessage = "INTERNAL SERVER ERROR";
         }
 
-        String saveToFile = parseSaveToFileArgument(args);
+        String saveToFile = null;
+        for (String arg : args) {
+            if (arg.startsWith("saveToFile=")) {
+                saveToFile = arg.substring("saveToFile=".length());
+                break;
+            }
+        }
+
         String outputFile = saveToFile != null ? saveToFile : "result.csv";
 
         try (PrintWriter writer = new PrintWriter(new FileWriter(outputFile))) {
@@ -134,22 +120,6 @@ public class CheckRunner {
         }
 
         System.err.println("Ошибка: " + errorMessage);
-    }
-
-    private static Product findProductById(List<Product> products, int id) {
-        return products.stream()
-                .filter(p -> p.getId() == id)
-                .findFirst()
-                .orElse(null);
-    }
-
-    private static DiscountCard findDiscountCard(List<DiscountCard> cards, String number) {
-        if (number == null) {
-            return null;
-        }
-        return cards.stream()
-                .filter(c -> c.getNumber().equals(number))
-                .findFirst()
-                .orElse(null);
+        e.printStackTrace();
     }
 }
